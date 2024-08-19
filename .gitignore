@@ -6,3 +6,4 @@ frontend/dist
 client.json
 assets.json
 logs/
+build/bin

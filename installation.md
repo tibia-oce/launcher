@@ -36,7 +36,8 @@
 
 ### Run the build (for Windows include: --platform windows/amd64)
     ```
-    wails build
+    mkdir -p build/windows && wails build -platform windows/amd64 -o build/windows/Slender.exe
+    mkdir -p build/linux && wails build -platform linux/amd64 -o build/linux/Slender
     ```
 
 
