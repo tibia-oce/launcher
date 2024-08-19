@@ -20,7 +20,7 @@ jobs:
 
     - name: Install Wails CLI
       run: |
-        curl -sSL https://wails.app/get | sh
+        go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
     - name: Install dependencies
       run: go mod tidy
