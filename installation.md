@@ -23,3 +23,7 @@ wails build
 
 # Run the binary
 chmod +x build/bin/Slender && ./build/bin/Slender
+
+# To create a new release
+git tag -a v1.0.1 -m "Release version 1.0.0"
+git push origin v1.0.1
