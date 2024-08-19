@@ -1,6 +1,6 @@
 # Slender Launcher
 
-This is the launcher for open tibia servers. It installs the client in %appdata% so you'll find it at:
+A multi-platform application designed for launching compiled tibia clients via remote install to the user's appdata. The launcher allows for making updates without any risk of overriding user settings.
 
 - Windows: `%appdata%/Slender` (`C:\Users\{username}\AppData\Roaming\Slender`)
 - MacOS: `~/Library/Application Support/Slender`
