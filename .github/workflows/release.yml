@@ -52,12 +52,12 @@ jobs:
       id: get_latest_tag
       run: |
         latest_tag=$(git tag --list 'v*' | sort -V | tail -n 1)
-        echo "LATEST_TAG=$latest_tag" >> $GITHUB_ENV
+        echo "::set-output name=latest_tag::$latest_tag"
 
     - name: Increment tag
       id: increment_tag
       run: |
-        latest_tag="${{ env.LATEST_TAG }}"
+        latest_tag="${{ steps.get_latest_tag.outputs.latest_tag }}"
         if [ -z "$latest_tag" ]; then
           new_tag="v0.0.1"
         else
@@ -67,16 +67,16 @@ jobs:
           new_patch=$((patch + 1))
           new_tag="v${major}.${minor}.${new_patch}"
         fi
-        echo "NEW_TAG=$new_tag" >> $GITHUB_ENV
+        echo "::set-output name=new_tag::$new_tag"
 
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       with:
-        tag_name: ${{ env.NEW_TAG }}
-        release_name: Release ${{ env.NEW_TAG }}
+        tag_name: ${{ steps.increment_tag.outputs.new_tag }}
+        release_name: Release ${{ steps.increment_tag.outputs.new_tag }}
         body: |
-          Automatically generated release for tag ${{ env.NEW_TAG }}.
+          Automatically generated release for tag ${{ steps.increment_tag.outputs.new_tag }}.
         draft: false
         prerelease: false
       env:
