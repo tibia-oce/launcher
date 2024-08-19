@@ -39,18 +39,39 @@ jobs:
         mkdir -p build/windows
         GOOS=windows GOARCH=amd64 go build -o build/windows/Slender.exe
 
+    - name: Get latest tag
+      id: get_latest_tag
+      run: |
+        latest_tag=$(git tag --list 'v*' | sort -V | tail -n 1)
+        echo "LATEST_TAG=$latest_tag" >> $GITHUB_ENV
+
+    - name: Increment tag
+      id: increment_tag
+      run: |
+        latest_tag="${{ env.LATEST_TAG }}"
+        if [ -z "$latest_tag" ]; then
+          new_tag="v0.0.1"
+        else
+          # Extract version numbers
+          IFS='.' read -r major minor patch <<< "${latest_tag#v}"
+          # Increment the patch number
+          new_patch=$((patch + 1))
+          new_tag="v${major}.${minor}.${new_patch}"
+        fi
+        echo "NEW_TAG=$new_tag" >> $GITHUB_ENV
+
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       with:
-        tag_name: ${{ github.sha }}
-        release_name: Release ${{ github.sha }}
+        tag_name: ${{ env.NEW_TAG }}
+        release_name: Release ${{ env.NEW_TAG }}
         body: |
-          Automatically generated release for commit ${{ github.sha }}.
+          Automatically generated release for tag ${{ env.NEW_TAG }}.
         draft: false
         prerelease: false
       env:
-        GITHUB_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload Linux Release Asset
       uses: actions/upload-release-asset@v1
