@@ -21,6 +21,14 @@ jobs:
     - name: Install dependencies
       run: go mod tidy
 
+    - name: Install frontend dependencies
+      run: npm install
+      working-directory: frontend
+
+    - name: Build frontend
+      run: npm run build
+      working-directory: frontend
+
     - name: Build binaries for Linux
       run: |
         mkdir -p build/linux
