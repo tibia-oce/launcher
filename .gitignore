@@ -5,3 +5,4 @@ frontend/dist
 .DS_Store
 client.json
 assets.json
+logs/
