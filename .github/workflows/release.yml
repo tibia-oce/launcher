@@ -2,8 +2,8 @@ name: Build and Release
 
 on:
   push:
-    branches:
-    - main
+    tags:
+    - 'v*'
 
 jobs:
   build:
@@ -48,35 +48,14 @@ jobs:
         mkdir -p build/windows
         wails build -platform windows/amd64 -o build/windows/Slender.exe
 
-    - name: Get latest tag
-      id: get_latest_tag
-      run: |
-        latest_tag=$(git tag --list 'v*' | sort -V | tail -n 1)
-        echo "::set-output name=latest_tag::$latest_tag"
-
-    - name: Increment tag
-      id: increment_tag
-      run: |
-        latest_tag="${{ steps.get_latest_tag.outputs.latest_tag }}"
-        if [ -z "$latest_tag" ]; then
-          new_tag="v0.0.1"
-        else
-          # Extract version numbers
-          IFS='.' read -r major minor patch <<< "${latest_tag#v}"
-          # Increment the patch number
-          new_patch=$((patch + 1))
-          new_tag="v${major}.${minor}.${new_patch}"
-        fi
-        echo "::set-output name=new_tag::$new_tag"
-
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       with:
-        tag_name: ${{ steps.increment_tag.outputs.new_tag }}
-        release_name: Release ${{ steps.increment_tag.outputs.new_tag }}
+        tag_name: ${{ github.ref_name }} # Use the tag name from the push event
+        release_name: Release ${{ github.ref_name }}
         body: |
-          Automatically generated release for tag ${{ steps.increment_tag.outputs.new_tag }}.
+          Automatically generated release for tag ${{ github.ref_name }}.
         draft: false
         prerelease: false
       env:
