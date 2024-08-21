@@ -7,3 +7,5 @@ client.json
 assets.json
 logs/
 build/bin
+frontend/wailsjs/*
+

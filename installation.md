@@ -10,7 +10,6 @@
     sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev npm pkg-config && sudo snap install go --classic
     ```
 
-
 ### Install nvm
     ```
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash
@@ -31,6 +30,11 @@
 ### Install go requirements
     ```
     go mod tidy && go mod download && go get -u && go mod verify
+    ```
+
+### Install npm requirements
+    ```
+    cd frontend && npm install --save-dev @tsconfig/svelte && cd ..
     ```
 
 
