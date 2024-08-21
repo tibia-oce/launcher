@@ -1,3 +1,5 @@
+// main.go
+
 package main
 
 import (
@@ -134,6 +136,7 @@ func doUpdate(logger *logrus.Logger, url string) error {
 }
 
 func main() {
+	// TODO: Pass .env variable as 'github.com/tibia-oce/otclient'
 	baseURL := "https://raw.githubusercontent.com/luan/tibia-client/main/"
 	executable, err := os.Executable()
 	if err != nil {

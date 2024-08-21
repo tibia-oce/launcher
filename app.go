@@ -1,3 +1,5 @@
+// app.go
+
 package main
 
 import (
@@ -66,6 +68,20 @@ type App struct {
 
 	queue  chan File
 	cancel chan struct{}
+}
+
+var mapKinds = map[int]string{
+	0: "https://tibiamaps.github.io/tibia-map-data/minimap-with-markers.zip",
+	1: "https://tibiamaps.github.io/tibia-map-data/minimap-without-markers.zip",
+	2: "https://tibiamaps.github.io/tibia-map-data/minimap-with-grid-overlay-and-markers.zip",
+	3: "https://tibiamaps.io/downloads/minimap-with-grid-overlay-without-markers",
+	4: "https://tibiamaps.github.io/tibia-map-data/minimap-with-grid-overlay-and-poi-markers.zip",
+}
+
+var mapLocations = map[string]string{
+	"mac":     "Contents/Resources/minimap",
+	"windows": "minimap",
+	"linux":   "minimap",
 }
 
 func NewApp(logger *logrus.Logger, baseURL string, appName string, parallel int) *App {
@@ -240,20 +256,6 @@ func (a *App) Update() {
 	for _, file := range files {
 		a.queue <- file
 	}
-}
-
-var mapKinds = map[int]string{
-	0: "https://tibiamaps.github.io/tibia-map-data/minimap-with-markers.zip",
-	1: "https://tibiamaps.github.io/tibia-map-data/minimap-without-markers.zip",
-	2: "https://tibiamaps.github.io/tibia-map-data/minimap-with-grid-overlay-and-markers.zip",
-	3: "https://tibiamaps.io/downloads/minimap-with-grid-overlay-without-markers",
-	4: "https://tibiamaps.github.io/tibia-map-data/minimap-with-grid-overlay-and-poi-markers.zip",
-}
-
-var mapLocations = map[string]string{
-	"mac":     "Contents/Resources/minimap",
-	"windows": "minimap",
-	"linux":   "minimap",
 }
 
 func (a *App) DownloadMaps(kind int) {

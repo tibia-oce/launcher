@@ -48,3 +48,77 @@ Look for baseURL in `main.go` and change it to a URL that can serve your game cl
 <img width="761" alt="image" src="https://github.com/luan/slender-launcher/assets/223760/0a44735c-1f87-4e40-8a82-e80c4c48c041">
 
 <img width="761" alt="image" src="https://github.com/luan/slender-launcher/assets/223760/2ca942ca-88b4-45b6-a0ff-70049f9cc009">
+
+```
+launcher
+├─ .github
+│  └─ workflows
+│     └─ release.yml
+├─ .gitignore
+├─ app.go
+├─ build
+│  ├─ appicon.png
+│  ├─ darwin
+│  │  ├─ Info.dev.plist
+│  │  └─ Info.plist
+│  ├─ linux
+│  ├─ README.md
+│  └─ windows
+│     ├─ icon.ico
+│     ├─ info.json
+│     ├─ installer
+│     │  ├─ project.nsi
+│     │  └─ wails_tools.nsh
+│     └─ wails.exe.manifest
+├─ cmd
+│  └─ launcher
+│     └─ main.go
+├─ docs
+│  └─ installation.md
+├─ frontend
+│  ├─ index.html
+│  ├─ package-lock.json
+│  ├─ package.json
+│  ├─ package.json.md5
+│  ├─ README.md
+│  ├─ src
+│  │  ├─ App.svelte
+│  │  ├─ assets
+│  │  │  ├─ fonts
+│  │  │  │  ├─ nunito-v16-latin-regular.woff2
+│  │  │  │  └─ OFL.txt
+│  │  │  └─ images
+│  │  │     ├─ background-artwork.jpg
+│  │  │     └─ logo-universal.png
+│  │  ├─ BackIcon.svelte
+│  │  ├─ CloseIcon.svelte
+│  │  ├─ DownloadIcon.svelte
+│  │  ├─ main.ts
+│  │  ├─ MainScreen.svelte
+│  │  ├─ PlayIcon.svelte
+│  │  ├─ Settings.svelte
+│  │  ├─ SettingsIcon.svelte
+│  │  ├─ style.css
+│  │  ├─ UpdateIcon.svelte
+│  │  └─ vite-env.d.ts
+│  ├─ svelte.config.js
+│  ├─ tsconfig.json
+│  ├─ tsconfig.node.json
+│  └─ vite.config.ts
+├─ go.mod
+├─ go.sum
+├─ internal
+│  ├─ config
+│  │  └─ config.go
+│  ├─ launcher
+│  │  └─ launcher.go
+│  └─ logging
+│     └─ logging.go
+├─ main.go
+├─ README.md
+├─ scripts
+│  └─ build.sh
+├─ Slender.exe
+└─ wails.json
+
+```
