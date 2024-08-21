@@ -2,10 +2,10 @@
   "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "Slender",
   "outputfilename": "Slender",
-  "ui:install": "npm install",
-  "ui:build": "npm run build",
-  "ui:dev:watcher": "npm run dev",
-  "ui:dev:serverUrl": "auto",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
   "author": {
     "name": "Luan Santos",
     "email": "github@luan.sh"
