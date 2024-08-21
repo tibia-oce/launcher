@@ -1,5 +1,3 @@
-// app.go
-
 package main
 
 import (
@@ -19,8 +17,9 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+	"launcher/internal/config"
+	"launcher/internal/logger"
+
 	"github.com/ulikunitz/xz/lzma"
 )
 
@@ -49,7 +48,7 @@ type ClientInfo struct {
 
 type App struct {
 	ctx     context.Context
-	logger  *logrus.Logger
+	config  *config.Config
 	baseURL string
 	appName string
 
@@ -84,9 +83,12 @@ var mapLocations = map[string]string{
 	"linux":   "minimap",
 }
 
-func NewApp(logger *logrus.Logger, baseURL string, appName string, parallel int) *App {
+func NewApp(baseURL string, appName string, parallel int) *App {
+	cfg := config.LoadConfig(appName)
+	logger.Init(cfg.LogLevel)
+
 	return &App{
-		logger:          logger,
+		config:          cfg,
 		baseURL:         baseURL,
 		queue:           make(chan File, 16),
 		cancel:          make(chan struct{}),
@@ -126,22 +128,22 @@ func (a *App) remoteAssetsJSON() string {
 func (a *App) refreshManifests() {
 	err := a.downloadFile(a.baseURL+a.remoteClientJSON(), "client.json", false)
 	if err != nil {
-		a.logger.Errorf("Error downloading %s: %v", a.remoteClientJSON(), err)
+		logger.Error(fmt.Errorf("Error downloading %s: %v", a.remoteClientJSON(), err))
 	}
 
 	err = readJSON(filepath.Join(a.appDirectory(), "client.json"), &a.clientInfo)
 	if err != nil {
-		a.logger.Errorf("Error reading %s: %v", "client.json", err)
+		logger.Error(fmt.Errorf("Error reading %s: %v", "client.json", err))
 	}
 
 	err = a.downloadFile(a.baseURL+a.remoteAssetsJSON(), "assets.json", false)
 	if err != nil {
-		a.logger.Errorf("Error downloading %s: %v", a.remoteAssetsJSON(), err)
+		logger.Error(fmt.Errorf("Error downloading %s: %v", a.remoteAssetsJSON(), err))
 	}
 
 	err = readJSON(filepath.Join(a.appDirectory(), "assets.json"), &a.assetsInfo)
 	if err != nil {
-		a.logger.Errorf("Error reading %s: %v", "assets.json", err)
+		logger.Error(fmt.Errorf("Error reading %s: %v", "assets.json", err))
 	}
 }
 
@@ -160,7 +162,7 @@ func (a *App) DownloadPercent() float64 {
 		return 0
 	}
 	percent := float64(a.downloadedBytes) / float64(a.totalBytes) * 100
-	a.logger.Infof("Downloaded %d/%d files |  %d/%d bytes (%.2f%%)", a.downloadedFiles, a.totalFiles, a.downloadedBytes, a.totalBytes, percent)
+	logger.Info(fmt.Sprintf("Downloaded %d/%d files |  %d/%d bytes (%.2f%%)", a.downloadedFiles, a.totalFiles, a.downloadedBytes, a.totalBytes, percent))
 	return percent
 }
 
@@ -181,19 +183,11 @@ func (a *App) DownloadedBytes() int64 {
 }
 
 func (a *App) ToggleLocal(value bool) {
-	a.logger.Infof("Setting enableLocal to %v", value)
-	viper.Set("enableLocal", value)
-	a.saveConfig()
-}
-
-func (a *App) saveConfig() {
-	if err := viper.WriteConfigAs(filepath.Join(configDirectory(a.appName), "config.toml")); err != nil {
-		a.logger.Errorf("Error writing config: %v", err)
-	}
+	a.config.SetEnableLocal(value)
 }
 
 func (a *App) LocalEnabled() bool {
-	return viper.GetBool("enableLocal")
+	return a.config.LocalEnabled()
 }
 
 func (a *App) OS() string {
@@ -216,7 +210,7 @@ func (a *App) ActiveDownload() string {
 func (a *App) Update() {
 	files, err := a.filesToUpdate()
 	if err != nil {
-		a.logger.Errorf("Error checking for updates: %v", err)
+		logger.Error(fmt.Errorf("Error checking for updates: %v", err))
 	}
 
 	a.totalFiles = int64(len(files))
@@ -244,10 +238,10 @@ func (a *App) Update() {
 					delete(a.activeDownloads, file.URL)
 					a.mutex.Unlock()
 					if err != nil {
-						a.logger.Errorf("Error downloading %s: %v", file.URL, err)
+						logger.Error(fmt.Errorf("Error downloading %s: %v", file.URL, err))
 						return
 					}
-					a.logger.Debugf("Downloaded %s", file.URL)
+					logger.Debug(fmt.Sprintf("Downloaded %s", file.URL))
 				}
 			}
 		}()
@@ -263,10 +257,10 @@ func (a *App) DownloadMaps(kind int) {
 	a.downloadedBytes = 0
 	a.totalFiles = 1
 	a.downloadedFiles = 0
-	a.logger.Infof("Downloading %s", mapKinds[kind])
+	logger.Info(fmt.Sprintf("Downloading %s", mapKinds[kind]))
 	err := a.downloadZip(mapKinds[kind], mapLocations[a.OS()], true)
 	if err != nil {
-		a.logger.Errorf("Error downloading %s: %v", mapKinds[kind], err)
+		logger.Error(fmt.Errorf("Error downloading %s: %v", mapKinds[kind], err))
 		return
 	}
 }
@@ -275,7 +269,7 @@ func (a *App) NeedsUpdate() bool {
 	a.refreshManifests()
 	files, err := a.filesToUpdate()
 	if err != nil {
-		a.logger.Errorf("Error checking for updates: %v", err)
+		logger.Error(fmt.Errorf("Error checking for updates: %v", err))
 		return false
 	}
 	return len(files) > 0
@@ -284,7 +278,7 @@ func (a *App) NeedsUpdate() bool {
 func (a *App) appDirectory() string {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
-		a.logger.Errorf("Error getting config directory: %v", err)
+		logger.Error(fmt.Errorf("Error getting config directory: %v", err))
 		return ""
 	}
 	appName := a.appName
@@ -308,19 +302,19 @@ func (a *App) filesToUpdate() ([]File, error) {
 
 			localFilePath := filepath.Join(a.appDirectory(), file.LocalFile)
 			if !fileExists(localFilePath) {
-				a.logger.Infof("File %s does not exist", localFilePath)
+				logger.Info(fmt.Sprintf("File %s does not exist", localFilePath))
 				mutex.Lock()
 				files = append(files, file)
 				mutex.Unlock()
 			} else {
 				localHash, err := sha256Sum(localFilePath)
 				if err != nil {
-					a.logger.Errorf("Error reading local file: %s\n", err)
+					logger.Error(fmt.Errorf("Error reading local file: %s\n", err))
 					return
 				}
 
 				if localHash != file.UnpackedHash {
-					a.logger.Infof("File %s has changed (local: %s, remote: %s)", localFilePath, string(localHash), file.UnpackedHash)
+					logger.Info(fmt.Sprintf("File %s has changed (local: %s, remote: %s)", localFilePath, string(localHash), file.UnpackedHash))
 					mutex.Lock()
 					files = append(files, file)
 					mutex.Unlock()
@@ -442,7 +436,8 @@ func unzip(src, dst string) error {
 }
 
 func (a *App) downloadFile(url, dst string, progress bool) error {
-	a.logger.Infof("Downloading %s to %s", url, dst)
+	logger.Info(fmt.Sprintf("Downloading %s to %s", url, dst))
+
 	dst = filepath.Join(a.appDirectory(), dst)
 	err := os.MkdirAll(filepath.Dir(dst), 0755)
 	if err != nil {
@@ -508,16 +503,16 @@ func (a *App) Play(local bool) {
 	if local {
 		executable = a.localExecutable()
 	}
-	a.logger.Infof("Launching %s", executable)
+	logger.Info(fmt.Sprintf("Launching %s", executable))
 	os.Chmod(a.executable(), 0755)
 	if err := syscall.Exec(executable, []string{"--battleeye"}, os.Environ()); err != nil {
-		a.logger.Errorf("Failed to launch %s: %s | attempting regular fork", executable, err)
+		logger.Error(fmt.Errorf("Failed to launch %s: %s | attempting regular fork", executable, err))
 		cmd := exec.Command(executable, "--battleeye")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Env = os.Environ()
 		if err := cmd.Start(); err != nil {
-			a.logger.Errorf("Failed to launch %s: %s", executable, err)
+			logger.Error(fmt.Errorf("Failed to launch %s: %s", executable, err))
 		}
 		os.Exit(0)
 	}

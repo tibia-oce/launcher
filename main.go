@@ -205,7 +205,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	app := NewApp(logger, baseURL, appName, parallel)
+	app := NewApp(baseURL, appName, parallel)
 
 	err = wails.Run(&options.App{
 		Title:  appName + " Launcher",

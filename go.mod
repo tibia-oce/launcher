@@ -1,10 +1,11 @@
-module slenderlauncher
+module launcher
 
 go 1.21
 
 toolchain go1.23.0
 
 require (
+	github.com/antonfisher/nested-logrus-formatter v1.3.1
 	github.com/inconshreveable/go-update v0.0.0-20160112193335-8152e7eb6ccf
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
