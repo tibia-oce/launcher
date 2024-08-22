@@ -16,6 +16,6 @@ func LoadConfig(appName string) *Config {
 		Parallel:    64,
 		BaseURL:     "https://raw.githubusercontent.com/luan/tibia-client/main/",
 		LogLevel:    "info",
-		EnableLocal: false, // TODO:  Allow switching client IP
+		EnableLocal: false,
 	}
 }
