@@ -1,11 +1,12 @@
 build/bin
 node_modules
-frontend/dist
+ui/dist
 
 .DS_Store
 client.json
 assets.json
 logs/
 build/bin
-frontend/wailsjs/*
+ui/wailsjs/*
+frontend/*
 *.exe

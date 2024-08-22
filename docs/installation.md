@@ -35,7 +35,7 @@
 
 ### Install npm requirements
     ```
-    cd frontend && npm install --save-dev @tsconfig/svelte && cd ..
+    cd ui && npm install --save-dev @tsconfig/svelte && cd ..
     ```
 
 
@@ -99,7 +99,7 @@
     ```
 ### Install npm Requirements
     ```
-    cd frontend
+    cd ui
     npm install --save-dev @tsconfig/svelte
     cd ..
     ```

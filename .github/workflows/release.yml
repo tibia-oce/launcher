@@ -18,13 +18,13 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y pkg-config build-essential libgtk-3-dev libwebkit2gtk-4.0-dev
 
-    - name: Install frontend dependencies
+    - name: Install ui dependencies
       run: npm install
-      working-directory: frontend
+      working-directory: ui
 
-    - name: Build frontend
+    - name: Build ui
       run: npm run build
-      working-directory: frontend
+      working-directory: ui
 
     - name: Set up Go
       uses: actions/setup-go@v3
