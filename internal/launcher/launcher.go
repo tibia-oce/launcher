@@ -87,10 +87,10 @@ var mapLocations = map[string]string{
 	"linux":   "minimap",
 }
 
-func NewApp(baseURL, appName string, cfg *config.Config) *App {
+func NewApp(appName string, cfg *config.Config) *App {
 	return &App{
 		config:          cfg,
-		baseURL:         baseURL,
+		baseURL:         cfg.BaseURL,
 		queue:           make(chan File, 16),
 		cancel:          make(chan struct{}),
 		activeDownloads: make(map[string]struct{}),

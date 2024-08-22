@@ -31,14 +31,13 @@ func main() {
 
 	executable = filepath.Base(executable)
 	appName := strings.TrimSuffix(executable, filepath.Ext(executable))
-	baseURL := "https://raw.githubusercontent.com/luan/tibia-client/main/"
 
 	logger.Init("info")
 	cfg := config.LoadConfig(appName)
 
-	app := launcher.NewApp(baseURL, appName, cfg)
+	app := launcher.NewApp(appName, cfg)
 
-	if err := app.DoUpdate(baseURL); err != nil {
+	if err := app.DoUpdate(cfg.BaseURL); err != nil {
 		logger.Error(fmt.Errorf("Failed to update: %v", err))
 		os.Exit(1)
 	}
