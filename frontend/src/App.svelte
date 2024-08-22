@@ -1,6 +1,6 @@
 <script lang="ts">
   import MainScreen from "./MainScreen.svelte";
-  import { Exit } from "../wailsjs/go/main/App.js";
+  import { Exit } from "../wailsjs/go/launcher/App.js";
   import { onMount } from "svelte";
   import Settings from "./Settings.svelte";
   import CloseIcon from "./CloseIcon.svelte";

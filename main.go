@@ -16,6 +16,8 @@ import (
 	"strings"
 	"syscall"
 
+	"launcher/internal/launcher"
+
 	"github.com/inconshreveable/go-update"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -70,7 +72,7 @@ func isAppUpdateAvailable(logger *logrus.Logger, url string) (bool, string) {
 		logger.Errorf("Error checking for app update: %s", err)
 		return false, ""
 	}
-	sha256Local, err := sha256Sum(currentExecutable)
+	sha256Local, err := launcher.Sha256Sum(currentExecutable)
 	if err != nil {
 		logger.Errorf("Error checking for app update: %s", err)
 		return false, ""
@@ -81,7 +83,7 @@ func isAppUpdateAvailable(logger *logrus.Logger, url string) (bool, string) {
 }
 
 func doUpdate(logger *logrus.Logger, url string) error {
-	if viper.GetBool("dev") || fileExists("wails.json") {
+	if viper.GetBool("dev") || launcher.FileExists("wails.json") {
 		logger.Infof("Skipping update check in dev mode")
 		return nil
 	}
@@ -205,7 +207,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	app := NewApp(baseURL, appName, parallel)
+	app := launcher.NewApp(baseURL, appName, parallel)
 
 	err = wails.Run(&options.App{
 		Title:  appName + " Launcher",
@@ -217,7 +219,7 @@ func main() {
 		DisableResize:    true,
 		Frameless:        true,
 		BackgroundColour: &options.RGBA{R: 13, G: 25, B: 51, A: 0},
-		OnStartup:        app.startup,
+		OnStartup:        app.Startup,
 		Windows: &windows.Options{
 			ZoomFactor:           1.0,
 			WebviewIsTransparent: true,

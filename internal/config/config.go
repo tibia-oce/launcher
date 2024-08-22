@@ -32,8 +32,7 @@ func LoadConfig(appName string) *Config {
 	}
 
 	return &Config{
-		AppName:  appName,
-		LogLevel: viper.GetString("logger.level"),
+		AppName: appName,
 	}
 }
 

@@ -15,7 +15,7 @@
     TotalFiles,
     Update,
     Version,
-  } from "../wailsjs/go/main/App.js";
+  } from "../wailsjs/go/launcher/App.js";
   import { onMount } from "svelte";
   import PlayIcon from "./PlayIcon.svelte";
   import UpdateIcon from "./UpdateIcon.svelte";
