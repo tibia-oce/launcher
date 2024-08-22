@@ -24,7 +24,6 @@ import (
 	"launcher/internal/logger"
 
 	"github.com/inconshreveable/go-update"
-	"github.com/spf13/viper"
 	"github.com/ulikunitz/xz/lzma"
 )
 
@@ -534,6 +533,7 @@ func (a *App) Write(p []byte) (n int, err error) {
 	return
 }
 
+// TODO: Move to internal/updater
 func isAppUpdateAvailable(url string) (bool, string) {
 	resp, err := http.Get(url + ".sha256")
 	if err != nil {
@@ -543,7 +543,8 @@ func isAppUpdateAvailable(url string) (bool, string) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		logger.Error(fmt.Errorf("Error checking for app update (resp): %s", resp.Status))
+		// If the repository is missing a launcher updater, then there is probably no need to log
+		// logger.Error(fmt.Errorf("Error checking for app update (resp): %s", resp.Status))
 		return false, ""
 	}
 	sha256RemoteBytes, err := io.ReadAll(resp.Body)
@@ -567,19 +568,8 @@ func isAppUpdateAvailable(url string) (bool, string) {
 	return sha256Local != sha256Remote, sha256Remote
 }
 
+// TODO: Move to internal/updater
 func (a *App) DoUpdate(url string) error {
-	executablePath, err := os.Executable()
-	if err != nil {
-		logger.Error(fmt.Errorf("Failed to get executable path: %v", err))
-		return err
-	}
-	projectRoot := filepath.Dir(executablePath)
-
-	wailsJSONPath := filepath.Join(projectRoot, "wails.json")
-	if viper.GetBool("dev") || fileutil.FileExists(wailsJSONPath) {
-		logger.Info("Skipping update check in dev mode")
-		return nil
-	}
 
 	ok, sha256String := isAppUpdateAvailable(url)
 	if !ok {
