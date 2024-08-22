@@ -1,9 +1,10 @@
+//internal\launcher\launcher.go
+
 package launcher
 
 import (
 	"archive/zip"
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -13,13 +14,17 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 
 	"launcher/internal/config"
+	"launcher/internal/fileutil"
 	"launcher/internal/logger"
 
+	"github.com/inconshreveable/go-update"
+	"github.com/spf13/viper"
 	"github.com/ulikunitz/xz/lzma"
 )
 
@@ -83,18 +88,14 @@ var mapLocations = map[string]string{
 	"linux":   "minimap",
 }
 
-func NewApp(baseURL string, appName string, parallel int) *App {
-
-	logger.Init("info")
-	cfg := config.LoadConfig(appName)
-
+func NewApp(baseURL, appName string, cfg *config.Config) *App {
 	return &App{
 		config:          cfg,
 		baseURL:         baseURL,
 		queue:           make(chan File, 16),
 		cancel:          make(chan struct{}),
 		activeDownloads: make(map[string]struct{}),
-		parallel:        parallel,
+		parallel:        cfg.Parallel,
 		appName:         appName,
 	}
 }
@@ -183,12 +184,12 @@ func (a *App) DownloadedBytes() int64 {
 	return a.downloadedBytes
 }
 
-func (a *App) ToggleLocal(value bool) {
-	a.config.SetEnableLocal(value)
+func (a *App) LocalEnabled() bool {
+	return a.config.EnableLocal
 }
 
-func (a *App) LocalEnabled() bool {
-	return a.config.LocalEnabled()
+func (a *App) ToggleLocal(value bool) {
+	a.config.EnableLocal = value
 }
 
 func (a *App) OS() string {
@@ -258,7 +259,7 @@ func (a *App) DownloadMaps(kind int) {
 	a.downloadedBytes = 0
 	a.totalFiles = 1
 	a.downloadedFiles = 0
-	logger.Info(fmt.Sprintf("Downloading %s", mapKinds[kind]))
+	// logger.Info(fmt.Sprintf("Downloading %s", mapKinds[kind]))
 	err := a.downloadZip(mapKinds[kind], mapLocations[a.OS()], true)
 	if err != nil {
 		logger.Error(fmt.Errorf("Error downloading %s: %v", mapKinds[kind], err))
@@ -302,20 +303,20 @@ func (a *App) filesToUpdate() ([]File, error) {
 			defer wg.Done()
 
 			localFilePath := filepath.Join(a.appDirectory(), file.LocalFile)
-			if !FileExists(localFilePath) {
-				logger.Info(fmt.Sprintf("File %s does not exist", localFilePath))
+			if !fileutil.FileExists(localFilePath) {
+				// logger.Info(fmt.Sprintf("File %s does not exist", localFilePath))
 				mutex.Lock()
 				files = append(files, file)
 				mutex.Unlock()
 			} else {
-				localHash, err := Sha256Sum(localFilePath)
+				localHash, err := fileutil.Sha256Sum(localFilePath)
 				if err != nil {
 					logger.Error(fmt.Errorf("Error reading local file: %s\n", err))
 					return
 				}
 
 				if localHash != file.UnpackedHash {
-					logger.Info(fmt.Sprintf("File %s has changed (local: %s, remote: %s)", localFilePath, string(localHash), file.UnpackedHash))
+					// logger.Info(fmt.Sprintf("File %s has changed (local: %s, remote: %s)", localFilePath, string(localHash), file.UnpackedHash))
 					mutex.Lock()
 					files = append(files, file)
 					mutex.Unlock()
@@ -327,13 +328,6 @@ func (a *App) filesToUpdate() ([]File, error) {
 	wg.Wait()
 
 	return files, nil
-}
-
-func FileExists(path string) bool {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return false
-	}
-	return true
 }
 
 func readJSON(s string, d interface{}) error {
@@ -437,7 +431,7 @@ func unzip(src, dst string) error {
 }
 
 func (a *App) downloadFile(url, dst string, progress bool) error {
-	logger.Info(fmt.Sprintf("Downloading %s to %s", url, dst))
+	// logger.Info(fmt.Sprintf("Downloading %s to %s", url, dst))
 
 	dst = filepath.Join(a.appDirectory(), dst)
 	err := os.MkdirAll(filepath.Dir(dst), 0755)
@@ -504,19 +498,34 @@ func (a *App) Play(local bool) {
 	if local {
 		executable = a.localExecutable()
 	}
+
 	logger.Info(fmt.Sprintf("Launching %s", executable))
-	os.Chmod(a.executable(), 0755)
-	if err := syscall.Exec(executable, []string{"--battleeye"}, os.Environ()); err != nil {
-		logger.Error(fmt.Errorf("Failed to launch %s: %s | attempting regular fork", executable, err))
-		cmd := exec.Command(executable, "--battleeye")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Env = os.Environ()
-		if err := cmd.Start(); err != nil {
-			logger.Error(fmt.Errorf("Failed to launch %s: %s", executable, err))
-		}
-		os.Exit(0)
+
+	err := os.Chmod(executable, 0755)
+	if err != nil {
+		logger.Error(fmt.Errorf("Failed to chmod %s: %v", executable, err))
+		return
 	}
+
+	if runtime.GOOS != "windows" {
+		if err := syscall.Exec(executable, nil, os.Environ()); err != nil {
+			logger.Error(fmt.Errorf("Failed to launch %s using syscall.Exec: %v", executable, err))
+		}
+	}
+
+	cmd := exec.Command(executable)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
+
+	logger.Info(fmt.Sprintf("Executing command: %s", strings.Join(cmd.Args, " ")))
+
+	if err := cmd.Start(); err != nil {
+		logger.Error(fmt.Errorf("Failed to launch %s using exec.Command: %v", executable, err))
+		os.Exit(1)
+	}
+
+	os.Exit(0)
 }
 
 func (a *App) Write(p []byte) (n int, err error) {
@@ -525,17 +534,98 @@ func (a *App) Write(p []byte) (n int, err error) {
 	return
 }
 
-func Sha256Sum(filename string) (string, error) {
-	f, err := os.Open(filename)
+func isAppUpdateAvailable(url string) (bool, string) {
+	resp, err := http.Get(url + ".sha256")
 	if err != nil {
-		return "", err
+		logger.Error(fmt.Errorf("Error checking for app update (Get): %s", err))
+		return false, ""
 	}
-	defer f.Close()
+	defer resp.Body.Close()
 
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+	if resp.StatusCode != http.StatusOK {
+		logger.Error(fmt.Errorf("Error checking for app update (resp): %s", resp.Status))
+		return false, ""
+	}
+	sha256RemoteBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Error(fmt.Errorf("Error checking for app update (sha256RemoteBytes): %s", err))
+		return false, ""
+	}
+	sha256Remote := strings.Fields(string(sha256RemoteBytes))[0]
+	currentExecutable, err := os.Executable()
+	if err != nil {
+		logger.Error(fmt.Errorf("Error checking for app update (currentExecutable): %s", err))
+		return false, ""
+	}
+	sha256Local, err := fileutil.Sha256Sum(currentExecutable)
+	if err != nil {
+		logger.Error(fmt.Errorf("Error checking for app update: %s", err))
+		return false, ""
+	}
+	logger.Info(fmt.Sprintf("Local SHA256: %s", sha256Local))
+	logger.Info(fmt.Sprintf("Remote SHA256: %s", sha256Remote))
+	return sha256Local != sha256Remote, sha256Remote
+}
+
+func (a *App) DoUpdate(url string) error {
+	executablePath, err := os.Executable()
+	if err != nil {
+		logger.Error(fmt.Errorf("Failed to get executable path: %v", err))
+		return err
+	}
+	projectRoot := filepath.Dir(executablePath)
+
+	wailsJSONPath := filepath.Join(projectRoot, "wails.json")
+	if viper.GetBool("dev") || fileutil.FileExists(wailsJSONPath) {
+		logger.Info("Skipping update check in dev mode")
+		return nil
 	}
 
-	return hex.EncodeToString(h.Sum(nil)), nil
+	ok, sha256String := isAppUpdateAvailable(url)
+	if !ok {
+		return nil
+	}
+	checksum, err := hex.DecodeString(sha256String)
+	if err != nil {
+		return err
+	}
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		logger.Info("No update available")
+		return nil
+	}
+	original, err := os.Executable()
+	if err != nil {
+		logger.Error(fmt.Errorf("Failed to get executable path: %v", err))
+		return err
+	}
+	logger.Info(fmt.Sprintf("Original executable: %s", original))
+	logger.Info("Applying update")
+
+	err = update.Apply(resp.Body, update.Options{Checksum: checksum})
+	if err != nil {
+		if rerr := update.RollbackError(err); rerr != nil {
+			logger.Error(fmt.Errorf("Failed to rollback from bad update: %v", rerr))
+		}
+		return err
+	}
+
+	logger.Info("Update applied successfully - restarting...")
+	logger.Info(original)
+	if err := syscall.Exec(original, os.Args, os.Environ()); err != nil {
+		logger.Error(fmt.Errorf("Failed to restart: %v, attempting regular fork", err))
+		cmd := exec.Command(original, os.Args[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			logger.Error(fmt.Errorf("Failed to fork: %v", err))
+			return err
+		}
+		os.Exit(0)
+	}
+	return nil
 }
