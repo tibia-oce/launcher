@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import BackIcon from "./BackIcon.svelte";
-  import { LocalEnabled, OpenClientLocation, ToggleLocal } from "../wailsjs/go/main/App.js";
+  import { LocalEnabled, OpenClientLocation, ToggleLocal } from "../wailsjs/go/launcher/App.js";
 
   export let closeSettings: () => void;
 

@@ -1,9 +1,10 @@
-package main
+//internal\launcher\launcher.go
+
+package launcher
 
 import (
 	"archive/zip"
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -13,12 +14,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+	"launcher/internal/config"
+	"launcher/internal/fileutil"
+	"launcher/internal/logger"
+
+	"github.com/inconshreveable/go-update"
 	"github.com/ulikunitz/xz/lzma"
 )
 
@@ -47,7 +52,7 @@ type ClientInfo struct {
 
 type App struct {
 	ctx     context.Context
-	logger  *logrus.Logger
+	config  *config.Config
 	baseURL string
 	appName string
 
@@ -68,19 +73,33 @@ type App struct {
 	cancel chan struct{}
 }
 
-func NewApp(logger *logrus.Logger, baseURL string, appName string, parallel int) *App {
+var mapKinds = map[int]string{
+	0: "https://tibiamaps.github.io/tibia-map-data/minimap-with-markers.zip",
+	1: "https://tibiamaps.github.io/tibia-map-data/minimap-without-markers.zip",
+	2: "https://tibiamaps.github.io/tibia-map-data/minimap-with-grid-overlay-and-markers.zip",
+	3: "https://tibiamaps.io/downloads/minimap-with-grid-overlay-without-markers",
+	4: "https://tibiamaps.github.io/tibia-map-data/minimap-with-grid-overlay-and-poi-markers.zip",
+}
+
+var mapLocations = map[string]string{
+	"mac":     "Contents/Resources/minimap",
+	"windows": "minimap",
+	"linux":   "minimap",
+}
+
+func NewApp(appName string, cfg *config.Config) *App {
 	return &App{
-		logger:          logger,
-		baseURL:         baseURL,
+		config:          cfg,
+		baseURL:         cfg.BaseURL,
 		queue:           make(chan File, 16),
 		cancel:          make(chan struct{}),
 		activeDownloads: make(map[string]struct{}),
-		parallel:        parallel,
+		parallel:        cfg.Parallel,
 		appName:         appName,
 	}
 }
 
-func (a *App) startup(ctx context.Context) {
+func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
@@ -110,22 +129,22 @@ func (a *App) remoteAssetsJSON() string {
 func (a *App) refreshManifests() {
 	err := a.downloadFile(a.baseURL+a.remoteClientJSON(), "client.json", false)
 	if err != nil {
-		a.logger.Errorf("Error downloading %s: %v", a.remoteClientJSON(), err)
+		logger.Error(fmt.Errorf("Error downloading %s: %v", a.remoteClientJSON(), err))
 	}
 
 	err = readJSON(filepath.Join(a.appDirectory(), "client.json"), &a.clientInfo)
 	if err != nil {
-		a.logger.Errorf("Error reading %s: %v", "client.json", err)
+		logger.Error(fmt.Errorf("Error reading %s: %v", "client.json", err))
 	}
 
 	err = a.downloadFile(a.baseURL+a.remoteAssetsJSON(), "assets.json", false)
 	if err != nil {
-		a.logger.Errorf("Error downloading %s: %v", a.remoteAssetsJSON(), err)
+		logger.Error(fmt.Errorf("Error downloading %s: %v", a.remoteAssetsJSON(), err))
 	}
 
 	err = readJSON(filepath.Join(a.appDirectory(), "assets.json"), &a.assetsInfo)
 	if err != nil {
-		a.logger.Errorf("Error reading %s: %v", "assets.json", err)
+		logger.Error(fmt.Errorf("Error reading %s: %v", "assets.json", err))
 	}
 }
 
@@ -144,7 +163,7 @@ func (a *App) DownloadPercent() float64 {
 		return 0
 	}
 	percent := float64(a.downloadedBytes) / float64(a.totalBytes) * 100
-	a.logger.Infof("Downloaded %d/%d files |  %d/%d bytes (%.2f%%)", a.downloadedFiles, a.totalFiles, a.downloadedBytes, a.totalBytes, percent)
+	logger.Info(fmt.Sprintf("Downloaded %d/%d files |  %d/%d bytes (%.2f%%)", a.downloadedFiles, a.totalFiles, a.downloadedBytes, a.totalBytes, percent))
 	return percent
 }
 
@@ -164,20 +183,12 @@ func (a *App) DownloadedBytes() int64 {
 	return a.downloadedBytes
 }
 
-func (a *App) ToggleLocal(value bool) {
-	a.logger.Infof("Setting enableLocal to %v", value)
-	viper.Set("enableLocal", value)
-	a.saveConfig()
-}
-
-func (a *App) saveConfig() {
-	if err := viper.WriteConfigAs(filepath.Join(configDirectory(a.appName), "config.toml")); err != nil {
-		a.logger.Errorf("Error writing config: %v", err)
-	}
-}
-
 func (a *App) LocalEnabled() bool {
-	return viper.GetBool("enableLocal")
+	return a.config.EnableLocal
+}
+
+func (a *App) ToggleLocal(value bool) {
+	a.config.EnableLocal = value
 }
 
 func (a *App) OS() string {
@@ -200,7 +211,7 @@ func (a *App) ActiveDownload() string {
 func (a *App) Update() {
 	files, err := a.filesToUpdate()
 	if err != nil {
-		a.logger.Errorf("Error checking for updates: %v", err)
+		logger.Error(fmt.Errorf("Error checking for updates: %v", err))
 	}
 
 	a.totalFiles = int64(len(files))
@@ -228,10 +239,10 @@ func (a *App) Update() {
 					delete(a.activeDownloads, file.URL)
 					a.mutex.Unlock()
 					if err != nil {
-						a.logger.Errorf("Error downloading %s: %v", file.URL, err)
+						logger.Error(fmt.Errorf("Error downloading %s: %v", file.URL, err))
 						return
 					}
-					a.logger.Debugf("Downloaded %s", file.URL)
+					logger.Debug(fmt.Sprintf("Downloaded %s", file.URL))
 				}
 			}
 		}()
@@ -242,29 +253,15 @@ func (a *App) Update() {
 	}
 }
 
-var mapKinds = map[int]string{
-	0: "https://tibiamaps.github.io/tibia-map-data/minimap-with-markers.zip",
-	1: "https://tibiamaps.github.io/tibia-map-data/minimap-without-markers.zip",
-	2: "https://tibiamaps.github.io/tibia-map-data/minimap-with-grid-overlay-and-markers.zip",
-	3: "https://tibiamaps.io/downloads/minimap-with-grid-overlay-without-markers",
-	4: "https://tibiamaps.github.io/tibia-map-data/minimap-with-grid-overlay-and-poi-markers.zip",
-}
-
-var mapLocations = map[string]string{
-	"mac":     "Contents/Resources/minimap",
-	"windows": "minimap",
-	"linux":   "minimap",
-}
-
 func (a *App) DownloadMaps(kind int) {
 	a.totalBytes = 0
 	a.downloadedBytes = 0
 	a.totalFiles = 1
 	a.downloadedFiles = 0
-	a.logger.Infof("Downloading %s", mapKinds[kind])
+	// logger.Info(fmt.Sprintf("Downloading %s", mapKinds[kind]))
 	err := a.downloadZip(mapKinds[kind], mapLocations[a.OS()], true)
 	if err != nil {
-		a.logger.Errorf("Error downloading %s: %v", mapKinds[kind], err)
+		logger.Error(fmt.Errorf("Error downloading %s: %v", mapKinds[kind], err))
 		return
 	}
 }
@@ -273,7 +270,7 @@ func (a *App) NeedsUpdate() bool {
 	a.refreshManifests()
 	files, err := a.filesToUpdate()
 	if err != nil {
-		a.logger.Errorf("Error checking for updates: %v", err)
+		logger.Error(fmt.Errorf("Error checking for updates: %v", err))
 		return false
 	}
 	return len(files) > 0
@@ -282,7 +279,7 @@ func (a *App) NeedsUpdate() bool {
 func (a *App) appDirectory() string {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
-		a.logger.Errorf("Error getting config directory: %v", err)
+		logger.Error(fmt.Errorf("Error getting config directory: %v", err))
 		return ""
 	}
 	appName := a.appName
@@ -305,20 +302,20 @@ func (a *App) filesToUpdate() ([]File, error) {
 			defer wg.Done()
 
 			localFilePath := filepath.Join(a.appDirectory(), file.LocalFile)
-			if !fileExists(localFilePath) {
-				a.logger.Infof("File %s does not exist", localFilePath)
+			if !fileutil.FileExists(localFilePath) {
+				// logger.Info(fmt.Sprintf("File %s does not exist", localFilePath))
 				mutex.Lock()
 				files = append(files, file)
 				mutex.Unlock()
 			} else {
-				localHash, err := sha256Sum(localFilePath)
+				localHash, err := fileutil.Sha256Sum(localFilePath)
 				if err != nil {
-					a.logger.Errorf("Error reading local file: %s\n", err)
+					logger.Error(fmt.Errorf("Error reading local file: %s\n", err))
 					return
 				}
 
 				if localHash != file.UnpackedHash {
-					a.logger.Infof("File %s has changed (local: %s, remote: %s)", localFilePath, string(localHash), file.UnpackedHash)
+					// logger.Info(fmt.Sprintf("File %s has changed (local: %s, remote: %s)", localFilePath, string(localHash), file.UnpackedHash))
 					mutex.Lock()
 					files = append(files, file)
 					mutex.Unlock()
@@ -330,13 +327,6 @@ func (a *App) filesToUpdate() ([]File, error) {
 	wg.Wait()
 
 	return files, nil
-}
-
-func fileExists(path string) bool {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return false
-	}
-	return true
 }
 
 func readJSON(s string, d interface{}) error {
@@ -440,7 +430,8 @@ func unzip(src, dst string) error {
 }
 
 func (a *App) downloadFile(url, dst string, progress bool) error {
-	a.logger.Infof("Downloading %s to %s", url, dst)
+	// logger.Info(fmt.Sprintf("Downloading %s to %s", url, dst))
+
 	dst = filepath.Join(a.appDirectory(), dst)
 	err := os.MkdirAll(filepath.Dir(dst), 0755)
 	if err != nil {
@@ -506,19 +497,34 @@ func (a *App) Play(local bool) {
 	if local {
 		executable = a.localExecutable()
 	}
-	a.logger.Infof("Launching %s", executable)
-	os.Chmod(a.executable(), 0755)
-	if err := syscall.Exec(executable, []string{"--battleeye"}, os.Environ()); err != nil {
-		a.logger.Errorf("Failed to launch %s: %s | attempting regular fork", executable, err)
-		cmd := exec.Command(executable, "--battleeye")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Env = os.Environ()
-		if err := cmd.Start(); err != nil {
-			a.logger.Errorf("Failed to launch %s: %s", executable, err)
-		}
-		os.Exit(0)
+
+	logger.Info(fmt.Sprintf("Launching %s", executable))
+
+	err := os.Chmod(executable, 0755)
+	if err != nil {
+		logger.Error(fmt.Errorf("Failed to chmod %s: %v", executable, err))
+		return
 	}
+
+	if runtime.GOOS != "windows" {
+		if err := syscall.Exec(executable, nil, os.Environ()); err != nil {
+			logger.Error(fmt.Errorf("Failed to launch %s using syscall.Exec: %v", executable, err))
+		}
+	}
+
+	cmd := exec.Command(executable)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
+
+	logger.Info(fmt.Sprintf("Executing command: %s", strings.Join(cmd.Args, " ")))
+
+	if err := cmd.Start(); err != nil {
+		logger.Error(fmt.Errorf("Failed to launch %s using exec.Command: %v", executable, err))
+		os.Exit(1)
+	}
+
+	os.Exit(0)
 }
 
 func (a *App) Write(p []byte) (n int, err error) {
@@ -527,17 +533,89 @@ func (a *App) Write(p []byte) (n int, err error) {
 	return
 }
 
-func sha256Sum(filename string) (string, error) {
-	f, err := os.Open(filename)
+// TODO: Move to internal/updater
+func isAppUpdateAvailable(url string) (bool, string) {
+	resp, err := http.Get(url + ".sha256")
 	if err != nil {
-		return "", err
+		logger.Error(fmt.Errorf("Error checking for app update (Get): %s", err))
+		return false, ""
 	}
-	defer f.Close()
+	defer resp.Body.Close()
 
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+	if resp.StatusCode != http.StatusOK {
+		// If the repository is missing a launcher updater, then there is probably no need to log
+		// logger.Error(fmt.Errorf("Error checking for app update (resp): %s", resp.Status))
+		return false, ""
+	}
+	sha256RemoteBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Error(fmt.Errorf("Error checking for app update (sha256RemoteBytes): %s", err))
+		return false, ""
+	}
+	sha256Remote := strings.Fields(string(sha256RemoteBytes))[0]
+	currentExecutable, err := os.Executable()
+	if err != nil {
+		logger.Error(fmt.Errorf("Error checking for app update (currentExecutable): %s", err))
+		return false, ""
+	}
+	sha256Local, err := fileutil.Sha256Sum(currentExecutable)
+	if err != nil {
+		logger.Error(fmt.Errorf("Error checking for app update: %s", err))
+		return false, ""
+	}
+	logger.Info(fmt.Sprintf("Local SHA256: %s", sha256Local))
+	logger.Info(fmt.Sprintf("Remote SHA256: %s", sha256Remote))
+	return sha256Local != sha256Remote, sha256Remote
+}
+
+// TODO: Move to internal/updater
+func (a *App) DoUpdate(url string) error {
+
+	ok, sha256String := isAppUpdateAvailable(url)
+	if !ok {
+		return nil
+	}
+	checksum, err := hex.DecodeString(sha256String)
+	if err != nil {
+		return err
+	}
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		logger.Info("No update available")
+		return nil
+	}
+	original, err := os.Executable()
+	if err != nil {
+		logger.Error(fmt.Errorf("Failed to get executable path: %v", err))
+		return err
+	}
+	logger.Info(fmt.Sprintf("Original executable: %s", original))
+	logger.Info("Applying update")
+
+	err = update.Apply(resp.Body, update.Options{Checksum: checksum})
+	if err != nil {
+		if rerr := update.RollbackError(err); rerr != nil {
+			logger.Error(fmt.Errorf("Failed to rollback from bad update: %v", rerr))
+		}
+		return err
 	}
 
-	return hex.EncodeToString(h.Sum(nil)), nil
+	logger.Info("Update applied successfully - restarting...")
+	logger.Info(original)
+	if err := syscall.Exec(original, os.Args, os.Environ()); err != nil {
+		logger.Error(fmt.Errorf("Failed to restart: %v, attempting regular fork", err))
+		cmd := exec.Command(original, os.Args[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			logger.Error(fmt.Errorf("Failed to fork: %v", err))
+			return err
+		}
+		os.Exit(0)
+	}
+	return nil
 }
