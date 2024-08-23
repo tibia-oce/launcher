@@ -28,17 +28,25 @@ import (
 )
 
 type File struct {
-	LocalFile    string `json:"localfile"`
-	PackedHash   string `json:"packedhash"`
-	PackedSize   int    `json:"packedsize"`
-	URL          string `json:"url"`
-	UnpackedHash string `json:"unpackedhash"`
-	UnpackedSize int    `json:"unpackedsize"`
+	LocalFile  string `json:"localfile"`
+	PackedHash string `json:"packedhash"`
+	PackedSize int    `json:"packedsize"`
+	URL        string `json:"url"`
 }
 
-type AssetsInfo struct {
+type ModulesInfo struct {
 	Files   []File `json:"files"`
-	Version int    `json:"version"`
+	Version string `json:"version"`
+}
+
+type ModsInfo struct {
+	Files   []File `json:"files"`
+	Version string `json:"version"`
+}
+
+type DataInfo struct {
+	Files   []File `json:"files"`
+	Version string `json:"version"`
 }
 
 type ClientInfo struct {
@@ -46,8 +54,6 @@ type ClientInfo struct {
 	Version    string `json:"version"`
 	Files      []File `json:"files"`
 	Executable string `json:"executable"`
-	Generation string `json:"generation"`
-	Variant    string `json:"variant"`
 }
 
 type App struct {
@@ -56,8 +62,10 @@ type App struct {
 	baseURL string
 	appName string
 
-	clientInfo ClientInfo
-	assetsInfo AssetsInfo
+	clientInfo  ClientInfo
+	modulesInfo ModulesInfo
+	modsInfo    ModsInfo
+	dataInfo    DataInfo
 
 	totalBytes      int64
 	totalFiles      int64
@@ -122,8 +130,16 @@ func (a *App) remoteClientJSON() string {
 	return "client." + a.OS() + ".json"
 }
 
-func (a *App) remoteAssetsJSON() string {
-	return "assets." + a.OS() + ".json"
+func (a *App) remoteModulesJSON() string {
+	return "modules." + a.OS() + ".json"
+}
+
+func (a *App) remoteDataJSON() string {
+	return "data." + a.OS() + ".json"
+}
+
+func (a *App) remoteModsJSON() string {
+	return "mods." + a.OS() + ".json"
 }
 
 func (a *App) refreshManifests() {
@@ -137,14 +153,34 @@ func (a *App) refreshManifests() {
 		logger.Error(fmt.Errorf("Error reading %s: %v", "client.json", err))
 	}
 
-	err = a.downloadFile(a.baseURL+a.remoteAssetsJSON(), "assets.json", false)
+	err = a.downloadFile(a.baseURL+a.remoteModulesJSON(), "modules.json", false)
 	if err != nil {
-		logger.Error(fmt.Errorf("Error downloading %s: %v", a.remoteAssetsJSON(), err))
+		logger.Error(fmt.Errorf("Error downloading %s: %v", a.remoteModulesJSON(), err))
 	}
 
-	err = readJSON(filepath.Join(a.appDirectory(), "assets.json"), &a.assetsInfo)
+	err = readJSON(filepath.Join(a.appDirectory(), "modules.json"), &a.modulesInfo)
 	if err != nil {
-		logger.Error(fmt.Errorf("Error reading %s: %v", "assets.json", err))
+		logger.Error(fmt.Errorf("Error reading %s: %v", "modules.json", err))
+	}
+
+	err = a.downloadFile(a.baseURL+a.remoteDataJSON(), "data.json", false)
+	if err != nil {
+		logger.Error(fmt.Errorf("Error downloading %s: %v", a.remoteDataJSON(), err))
+	}
+
+	err = readJSON(filepath.Join(a.appDirectory(), "data.json"), &a.dataInfo)
+	if err != nil {
+		logger.Error(fmt.Errorf("Error reading %s: %v", "data.json", err))
+	}
+
+	err = a.downloadFile(a.baseURL+a.remoteModsJSON(), "mods.json", false)
+	if err != nil {
+		logger.Error(fmt.Errorf("Error downloading %s: %v", a.remoteModsJSON(), err))
+	}
+
+	err = readJSON(filepath.Join(a.appDirectory(), "mods.json"), &a.modsInfo)
+	if err != nil {
+		logger.Error(fmt.Errorf("Error reading %s: %v", "mods.json", err))
 	}
 }
 
@@ -291,7 +327,10 @@ func (a *App) appDirectory() string {
 
 func (a *App) filesToUpdate() ([]File, error) {
 	var files []File
-	filesTocheck := append(a.assetsInfo.Files, a.clientInfo.Files...)
+	filesTocheck := append([]File{}, a.modulesInfo.Files...)
+	filesTocheck = append(filesTocheck, a.dataInfo.Files...)
+	filesTocheck = append(filesTocheck, a.clientInfo.Files...)
+	filesTocheck = append(filesTocheck, a.modsInfo.Files...)
 
 	mutex := sync.Mutex{}
 	wg := sync.WaitGroup{}
@@ -314,7 +353,7 @@ func (a *App) filesToUpdate() ([]File, error) {
 					return
 				}
 
-				if localHash != file.UnpackedHash {
+				if localHash != file.PackedHash {
 					// logger.Info(fmt.Sprintf("File %s has changed (local: %s, remote: %s)", localFilePath, string(localHash), file.UnpackedHash))
 					mutex.Lock()
 					files = append(files, file)

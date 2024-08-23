@@ -14,7 +14,7 @@ func LoadConfig(appName string) *Config {
 	return &Config{
 		AppName:     appName,
 		Parallel:    64,
-		BaseURL:     "https://raw.githubusercontent.com/luan/tibia-client/main/",
+		BaseURL:     "https://raw.githubusercontent.com/tibia-oce/client/main/",
 		LogLevel:    "info",
 		EnableLocal: false,
 	}
