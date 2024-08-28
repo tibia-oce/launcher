@@ -24,7 +24,6 @@ import (
 	"launcher/internal/logger"
 
 	"github.com/inconshreveable/go-update"
-	"github.com/ulikunitz/xz/lzma"
 )
 
 type File struct {
@@ -248,6 +247,7 @@ func (a *App) Update() {
 	files, err := a.filesToUpdate()
 	if err != nil {
 		logger.Error(fmt.Errorf("Error checking for updates: %v", err))
+		return
 	}
 
 	a.totalFiles = int64(len(files))
@@ -270,7 +270,18 @@ func (a *App) Update() {
 					a.mutex.Lock()
 					a.activeDownloads[file.URL] = struct{}{}
 					a.mutex.Unlock()
-					err := a.downloadFile(a.baseURL+file.URL, file.LocalFile, true)
+
+					var downloadURL string
+					if strings.HasSuffix(file.URL, ".spr") {
+						// If it's a .spr file (which is handled by Git LFS), construct the GitHub API URL instead
+						downloadURL = strings.Replace(a.baseURL+file.URL, "https://raw.githubusercontent.com/", "https://api.github.com/repos/", 1)
+						downloadURL = strings.Replace(downloadURL, "/main/", "/contents/", 1)
+					} else {
+						// For all other files, use the raw content URL
+						downloadURL = a.baseURL + file.URL
+					}
+
+					err := a.downloadFile(downloadURL, file.LocalFile, true)
 					a.mutex.Lock()
 					delete(a.activeDownloads, file.URL)
 					a.mutex.Unlock()
@@ -469,8 +480,79 @@ func unzip(src, dst string) error {
 }
 
 func (a *App) downloadFile(url, dst string, progress bool) error {
-	// logger.Info(fmt.Sprintf("Downloading %s to %s", url, dst))
+	// Check if the file is a .spr file
+	if strings.HasSuffix(url, ".spr") {
+		// Construct the API URL for the .spr file
+		apiUrl := strings.Replace(url, "https://raw.githubusercontent.com/", "https://api.github.com/repos/", 1)
+		apiUrl = strings.Replace(apiUrl, "/main/", "/contents/", 1)
 
+		// Ensure the destination directory exists
+		dst = filepath.Join(a.appDirectory(), dst)
+		err := os.MkdirAll(filepath.Dir(dst), 0755)
+		if err != nil {
+			return err
+		}
+
+		// Create the destination file
+		out, err := os.Create(dst)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		// Make the HTTP GET request to the GitHub API
+		req, err := http.NewRequest("GET", apiUrl, nil)
+		if err != nil {
+			return err
+		}
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("failed to get file metadata: %s", resp.Status)
+		}
+
+		// Parse the JSON response to extract the download URL
+		var fileInfo struct {
+			DownloadUrl string `json:"download_url"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&fileInfo)
+		if err != nil {
+			return err
+		}
+
+		// Now download the actual file content using the download URL
+		fileResp, err := http.Get(fileInfo.DownloadUrl)
+		if err != nil {
+			return err
+		}
+		defer fileResp.Body.Close()
+
+		if fileResp.StatusCode != http.StatusOK {
+			return fmt.Errorf("failed to download file: %s", fileResp.Status)
+		}
+
+		var reader io.Reader = fileResp.Body
+		if progress {
+			reader = io.TeeReader(reader, a)
+		}
+
+		_, err = io.Copy(out, reader)
+		if err != nil {
+			return err
+		}
+
+		atomic.AddInt64(&a.downloadedFiles, 1)
+
+		return nil
+	}
+
+	// For non-.spr files, use the raw content URL
 	dst = filepath.Join(a.appDirectory(), dst)
 	err := os.MkdirAll(filepath.Dir(dst), 0755)
 	if err != nil {
@@ -490,20 +572,12 @@ func (a *App) downloadFile(url, dst string, progress bool) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return err
+		return fmt.Errorf("failed to download file: %s", resp.Status)
 	}
 
 	var reader io.Reader = resp.Body
 	if progress {
 		reader = io.TeeReader(reader, a)
-	}
-
-	if filepath.Ext(dst) != ".lzma" && filepath.Ext(url) == ".lzma" {
-		lzmaReader, err := lzma.NewReader(reader)
-		if err != nil {
-			return err
-		}
-		reader = lzmaReader
 	}
 
 	_, err = io.Copy(out, reader)

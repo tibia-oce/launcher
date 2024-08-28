@@ -41,8 +41,8 @@
 
 ### Run the build (for Windows include: --platform windows/amd64)
     ```
-    mkdir -p build/windows && wails build -platform windows/amd64 -o build/windows/Slender.exe
-    mkdir -p build/linux && wails build -platform linux/amd64 -o build/linux/Slender
+    mkdir -p build/windows && wails build -platform windows/amd64 -o Launcher.exe
+    mkdir -p build/linux && wails build -platform linux/amd64 -o Launcher
     ```
 
 
@@ -107,12 +107,10 @@
 ### Create directories and build
     ```
     New-Item -Path "build\windows" -ItemType Directory -Force
-    wails build -platform windows/amd64 -o build\windows\Slender.exe
-    New-Item -Path "build\linux" -ItemType Directory -Force
-    wails build -platform linux/amd64 -o build\linux\Slender
+    wails build -platform windows/amd64 -o Launcher.exe
     ```
 
 ### Run the binary (assuming `Slender.exe` is built)
     ```
-    .\build\windows\Slender.exe
+    .\build\bin\Launcher.exe
     ```

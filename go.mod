@@ -8,7 +8,6 @@ require (
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
 	github.com/inconshreveable/go-update v0.0.0-20160112193335-8152e7eb6ccf
 	github.com/sirupsen/logrus v1.9.3
-	github.com/ulikunitz/xz v0.5.12
 	github.com/wailsapp/wails/v2 v2.9.1
 )
 
