@@ -49,12 +49,6 @@ jobs:
           mkdir -p build/windows
           wails build -platform windows/amd64 -o build/windows/Slender.exe
 
-      - name: Prepare release assets
-        run: |
-          mkdir -p release-assets
-          cp build/linux/Slender release-assets/Slender
-          cp build/windows/Slender.exe release-assets/Slender.exe
-
       - name: Install Semantic Release
         run: npm install semantic-release @semantic-release/github --save-dev
 
@@ -66,6 +60,29 @@ jobs:
 
       - name: Semantic Release (Full Release on Push)
         if: ${{ github.event_name == 'push' }}
+        id: semantic_release  # Set an ID to reference this step's outputs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx semantic-release --ci --config .github/.releaserc.json
+
+      - name: Upload Linux Release Asset
+        if: ${{ github.event_name == 'push' && success() }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.semantic_release.outputs.upload_url }}
+          asset_path: build/linux/Slender
+          asset_name: Slender-linux-amd64
+          asset_content_type: application/octet-stream
+
+      - name: Upload Windows Release Asset
+        if: ${{ github.event_name == 'push' && success() }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.semantic_release.outputs.upload_url }}
+          asset_path: build/windows/Slender.exe
+          asset_name: Slender-windows-amd64.exe
+          asset_content_type: application/octet-stream
