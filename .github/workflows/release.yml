@@ -2,70 +2,72 @@ name: Build and Release
 
 on:
   push:
+    branches:
+      - master
+      - develop
     tags:
-    - 'v*'
+      - 'v*'
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y pkg-config build-essential libgtk-3-dev libwebkit2gtk-4.0-dev
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config build-essential libgtk-3-dev libwebkit2gtk-4.0-dev
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: '1.23'
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.23'
 
-    - name: Install Wails CLI
-      run: |
-        go install github.com/wailsapp/wails/v2/cmd/wails@latest
+      - name: Install Wails CLI
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-    - name: Build binaries for Linux
-      run: |
-        mkdir -p build/linux
-        wails build -platform linux/amd64 -o linux/Slender
+      - name: Build binaries for Linux
+        run: |
+          mkdir -p build/linux
+          wails build -platform linux/amd64 -o build/linux/Slender
 
-    - name: Build binaries for Windows
-      run: |
-        mkdir -p build/windows
-        wails build -platform windows/amd64 -o windows/Slender.exe
+      - name: Build binaries for Windows
+        run: |
+          mkdir -p build/windows
+          wails build -platform windows/amd64 -o build/windows/Slender.exe
 
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
-        body: |
-          Automatically generated release for tag ${{ github.ref_name }}.
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      - name: Semantic Release
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        uses: semantic-release/semantic-release@v3
+        with:
+          args: |
+            --ci
+            --repository-url=https://github.com/${{ github.repository }}
+            --branches=master,develop
 
-    - name: Upload Linux Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GHCR_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: build/bin/linux/Slender
-        asset_name: Slender-linux-amd64
-        asset_content_type: application/octet-stream
+      - name: Upload Linux Release Asset
+        if: ${{ success() }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        with:
+          upload_url: ${{ steps.semantic-release.outputs.upload_url }}
+          asset_path: build/linux/Slender
+          asset_name: Slender-linux-amd64
+          asset_content_type: application/octet-stream
 
-    - name: Upload Windows Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GHCR_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: build/bin/windows/Slender.exe
-        asset_name: Slender-windows-amd64.exe
-        asset_content_type: application/octet-stream
+      - name: Upload Windows Release Asset
+        if: ${{ success() }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        with:
+          upload_url: ${{ steps.semantic-release.outputs.upload_url }}
+          asset_path: build/windows/Slender.exe
+          asset_name: Slender-windows-amd64.exe
+          asset_content_type: application/octet-stream
