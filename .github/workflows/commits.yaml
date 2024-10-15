@@ -24,6 +24,12 @@ jobs:
       
       - name: Lint commit messages
         run: |
-          RANGE=$((COMMIT_COUNT < 20 ? COMMIT_COUNT : 20))
-          npx --prefix .github/semantic-release commitlint --config .github/semantic-release/commitlint.config.js --from=HEAD~${RANGE} --to=HEAD
-      
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          RANGE=$((COMMIT_COUNT < 20 ? COMMIT_COUNT - 1 : 19))
+          if [ "$COMMIT_COUNT" -gt 1 ]; then
+            npx --prefix .github/semantic-release commitlint \
+              --config .github/semantic-release/commitlint.config.js \
+              --from=HEAD~${RANGE} --to=HEAD
+          else
+            echo "Skipping commit linting as there are not enough commits."
+          fi
