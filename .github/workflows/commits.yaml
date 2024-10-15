@@ -5,31 +5,14 @@ on:
     branches:
       - master
       - develop
+      
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
-  commit-lint:
+  commitlint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          # Fetch the entire history
-          fetch-depth: 0
-
-      - name: Install dependencies
-        run: npm ci --prefix .github/semantic-release
-
-      - name: Get Commit Count
-        run: echo "COMMIT_COUNT=$(git rev-list --count HEAD)" >> $GITHUB_ENV
-      
-      - name: Lint commit messages
-        run: |
-          COMMIT_COUNT=$(git rev-list --count HEAD)
-          RANGE=$((COMMIT_COUNT < 20 ? COMMIT_COUNT - 1 : 19))
-          if [ "$COMMIT_COUNT" -gt 1 ]; then
-            npx --prefix .github/semantic-release commitlint \
-              --config .github/semantic-release/commitlint.config.js \
-              --from=HEAD~${RANGE} --to=HEAD
-          else
-            echo "Skipping commit linting as there are not enough commits."
-          fi
+      - uses: actions/checkout@v3
+      - uses: wagoid/commitlint-github-action@v6
