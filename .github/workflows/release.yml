@@ -7,6 +7,10 @@ on:
       - develop
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - master
+      - develop
 
 jobs:
   release:
@@ -40,7 +44,20 @@ jobs:
           mkdir -p build/windows
           wails build -platform windows/amd64 -o build/windows/Slender.exe
 
-      - name: Semantic Release
+      - name: Semantic Release (Dry Run for PRs)
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        uses: semantic-release/semantic-release@v11.0.0
+        with:
+          args: |
+            --ci
+            --dry-run
+            --repository-url=https://github.com/${{ github.repository }}
+            --branches=master,develop
+
+      - name: Semantic Release (Full Release on Push)
+        if: ${{ github.event_name == 'push' }}
         env:
           GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
         uses: semantic-release/semantic-release@v11.0.0
@@ -51,23 +68,23 @@ jobs:
             --branches=master,develop
 
       - name: Upload Linux Release Asset
-        if: ${{ success() }}
+        if: ${{ github.event_name == 'push' && success() }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GHCR_TOKEN }}
         with:
-          upload_url: ${{ steps.semantic-release.outputs.upload_url }}
+          upload_url: ${{ steps['Semantic Release (Full Release on Push)'].outputs.upload_url }}
           asset_path: build/linux/Slender
           asset_name: Slender-linux-amd64
           asset_content_type: application/octet-stream
 
       - name: Upload Windows Release Asset
-        if: ${{ success() }}
+        if: ${{ github.event_name == 'push' && success() }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GHCR_TOKEN }}
         with:
-          upload_url: ${{ steps.semantic-release.outputs.upload_url }}
+          upload_url: ${{ steps['Semantic Release (Full Release on Push)'].outputs.upload_url }}
           asset_path: build/windows/Slender.exe
           asset_name: Slender-windows-amd64.exe
           asset_content_type: application/octet-stream
