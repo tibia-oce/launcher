@@ -49,6 +49,12 @@ jobs:
           mkdir -p build/windows
           wails build -platform windows/amd64 -o build/windows/Slender.exe
 
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          cp build/linux/Slender release-assets/Slender
+          cp build/windows/Slender.exe release-assets/Slender.exe
+
       - name: Install Semantic Release
         run: npm install semantic-release @semantic-release/github --save-dev
 
@@ -56,10 +62,10 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release --ci --dry-run --branches master,develop
+        run: npx semantic-release --ci --dry-run --config .github/.releaserc.json
 
       - name: Semantic Release (Full Release on Push)
         if: ${{ github.event_name == 'push' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release --ci --branches master,develop
+        run: npx semantic-release --ci --config .github/.releaserc.json
