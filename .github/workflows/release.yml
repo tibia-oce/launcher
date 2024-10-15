@@ -7,6 +7,10 @@ on:
       - develop
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - master
+      - develop
 
 jobs:
   release:
@@ -15,6 +19,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
 
       - name: Install dependencies
         run: |
@@ -40,34 +49,41 @@ jobs:
           mkdir -p build/windows
           wails build -platform windows/amd64 -o build/windows/Slender.exe
 
-      - name: Semantic Release
+      - name: Install Semantic Release
+        run: npm install semantic-release @semantic-release/github @semantic-release/npm --save-dev
+
+      - name: Semantic Release (Dry Run for PRs)
+        if: ${{ github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
-        uses: semantic-release/semantic-release@v3
-        with:
-          args: |
-            --ci
-            --repository-url=https://github.com/${{ github.repository }}
-            --branches=master,develop
+          NPM_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: npx semantic-release --ci --dry-run --branches master,develop
+
+      - name: Semantic Release (Full Release on Push)
+        if: ${{ github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          NPM_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: npx semantic-release --ci --branches master,develop
 
       - name: Upload Linux Release Asset
-        if: ${{ success() }}
+        if: ${{ github.event_name == 'push' && success() }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GHCR_TOKEN }}
         with:
-          upload_url: ${{ steps.semantic-release.outputs.upload_url }}
+          upload_url: ${{ steps['Semantic Release (Full Release on Push)'].outputs.upload_url }}
           asset_path: build/linux/Slender
           asset_name: Slender-linux-amd64
           asset_content_type: application/octet-stream
 
       - name: Upload Windows Release Asset
-        if: ${{ success() }}
+        if: ${{ github.event_name == 'push' && success() }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GHCR_TOKEN }}
         with:
-          upload_url: ${{ steps.semantic-release.outputs.upload_url }}
+          upload_url: ${{ steps['Semantic Release (Full Release on Push)'].outputs.upload_url }}
           asset_path: build/windows/Slender.exe
           asset_name: Slender-windows-amd64.exe
           asset_content_type: application/octet-stream
