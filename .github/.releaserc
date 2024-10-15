@@ -7,8 +7,8 @@
       "@semantic-release/github",
       {
         "assets": [
-          { "path": "release-assets/Slender", "label": "Slender (Linux)" },
-          { "path": "release-assets/Slender.exe", "label": "Slender (Windows)" }
+          { "path": "build/linux/Slender", "label": "Slender (Linux)" },
+          { "path": "build/windows/Slender.exe", "label": "Slender (Windows)" }
         ]
       }
     ]
