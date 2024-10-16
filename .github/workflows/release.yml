@@ -64,4 +64,3 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEBUG: semantic-release:*
         run: npx semantic-release --ci --config .github/.releaserc
-      

@@ -1,8 +1,10 @@
 {
   "branches": [
-    "master",
-    "develop"
+    { "name": "master" },
+    { "name": "develop", "prerelease": "dev" }
   ],
+  "repositoryUrl": "https://github.com/tibia-oce/launcher",
+  "tagFormat": "v${version}",
   "plugins": [
     "@semantic-release/commit-analyzer",
     [
