@@ -56,11 +56,11 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release --ci --dry-run --config .github/.releaserc
+        run: npx semantic-release --ci --dry-run --config ./.github/.releaserc.json
 
       - name: Semantic Release (Full Release on Push)
         if: ${{ github.event_name == 'push' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEBUG: semantic-release:*
-        run: npx semantic-release --ci --config .github/.releaserc
+        run: npx semantic-release --ci --config ./.github/.releaserc.json
