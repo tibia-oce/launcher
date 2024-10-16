@@ -1,33 +1,17 @@
 {
   "branches": [
-    { "name": "master" },
-    { "name": "develop", "prerelease": "dev" }
+    { "name": "master", "prerelease": false },
+    { "name": "develop", "prerelease": true }
   ],
-  "repositoryUrl": "https://github.com/tibia-oce/launcher",
-  "tagFormat": "v${version}",
   "plugins": [
     "@semantic-release/commit-analyzer",
-    [
-      "@semantic-release/release-notes-generator",
-      {
-        "presetConfig": {
-          "types": [
-            { "type": "feat", "section": "Features", "release": "minor" },
-            { "type": "fix", "section": "Bug Fixes", "release": "patch" },
-            { "type": "chore", "section": "Chores", "release": false },
-            { "type": "perf", "section": "Performance Improvements", "release": "patch" },
-            { "type": "docs", "section": "Documentation", "release": false },
-            { "type": "refactor", "section": "Code Refactoring", "release": "patch" }
-          ]
-        }
-      }
-    ],
+    "@semantic-release/release-notes-generator",
     [
       "@semantic-release/github",
       {
         "assets": [
-          { "path": "build/linux/Slender", "label": "Slender (Linux)" },
-          { "path": "build/windows/Slender.exe", "label": "Slender (Windows)" }
+          { "path": "release-assets/Slender", "label": "Slender (Linux)" },
+          { "path": "release-assets/Slender.exe", "label": "Slender (Windows)" }
         ]
       }
     ]
