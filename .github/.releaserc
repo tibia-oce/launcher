@@ -1,8 +1,28 @@
 {
-  "branches": ["master", "develop"],
+  "branches": [
+    "master",
+    {
+      "name": "develop",
+      "prerelease": "dev"
+    }
+  ],
   "plugins": [
     "@semantic-release/commit-analyzer",
-    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "presetConfig": {
+          "types": [
+            { "type": "feat", "section": "Features", "release": "minor" },
+            { "type": "fix", "section": "Bug Fixes", "release": "patch" },
+            { "type": "chore", "section": "Chores", "release": false },
+            { "type": "perf", "section": "Performance Improvements", "release": "patch" },
+            { "type": "docs", "section": "Documentation", "release": false },
+            { "type": "refactor", "section": "Code Refactoring", "release": "patch" }
+          ]
+        }
+      }
+    ],
     [
       "@semantic-release/github",
       {
@@ -12,5 +32,6 @@
         ]
       }
     ]
-  ]
+  ],
+  "tagFormat": "v${version}"
 }
