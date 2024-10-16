@@ -1,19 +1,8 @@
 {
-  "branches": [
-    { "name": "master", "prerelease": false },
-    { "name": "develop", "prerelease": true }
-  ],
+  "branches": ["master", "develop"],
   "plugins": [
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
-    [
-      "@semantic-release/github",
-      {
-        "assets": [
-          { "path": "release-assets/Slender", "label": "Slender (Linux)" },
-          { "path": "release-assets/Slender.exe", "label": "Slender (Windows)" }
-        ]
-      }
-    ]
+    "@semantic-release/github"
   ]
 }
