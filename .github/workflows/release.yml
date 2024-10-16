@@ -51,6 +51,13 @@ jobs:
 
       - name: Install Semantic Release
         run: npm install semantic-release @semantic-release/github --save-dev
+      
+      # semantic-release doesn't support pathing to a config file unless using a .js config:
+      # https://github.com/semantic-release/semantic-release/issues/1592#issuecomment-902533435
+      # instead copy the file to the root as a workaround to maintain workflow separtion
+      - name: Copy Release Config to Root
+        run: |
+          cp .github/.releaserc ./
 
       - name: Semantic Release (Dry Run for PRs)
         if: ${{ github.event_name == 'pull_request' }}
