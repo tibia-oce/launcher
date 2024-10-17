@@ -30,7 +30,7 @@
 
 ### Install go requirements
     ```
-    go mod tidy && go mod download && go get -u && go mod verify && go build -o Slender.exe
+    go mod tidy && go mod download && go get -u && go mod verify && go build -o Mythbound.exe
     ```
 
 ### Install npm requirements
@@ -48,7 +48,7 @@
 
 ### Run the binary
     ```
-    chmod +x build/bin/Slender && ./build/bin/Slender
+    chmod +x build/bin/Mythbound && ./build/bin/Mythbound
     ```
 
 
@@ -110,7 +110,7 @@
     wails build -platform windows/amd64 -o Launcher.exe
     ```
 
-### Run the binary (assuming `Slender.exe` is built)
+### Run the binary (assuming `Mythbound.exe` is built)
     ```
     .\build\bin\Launcher.exe
     ```

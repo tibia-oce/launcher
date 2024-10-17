@@ -1,0 +1,27 @@
+{
+  "branches": [
+    { "name": "master", "prerelease": false },
+    { "name": "develop", "prerelease": "alpha" }
+  ],
+  "tagFormat": "v${version}",
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "writerOpts": {
+          "headerPartial": ""
+        }
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          { "path": "bin/build/linux/Mythbound", "name": "Mythbound (Linux)", "label": "Mythbound (Linux)" },
+          { "path": "bin/build/windows/Mythbound.exe", "name": "Mythbound.exe (Windows)", "label": "Mythbound.exe (Windows)" }
+        ]
+      }
+    ]
+  ]
+}
