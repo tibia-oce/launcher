@@ -2,7 +2,7 @@ module launcher
 
 go 1.21
 
-toolchain go1.23.0
+toolchain go1.23.2
 
 require (
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
