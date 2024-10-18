@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define paths and default values
-BIN_PATH=${1:-"build/bin/Slender"}
+BIN_PATH=${1:-"build/bin/Mythbound"}
 LOG_DIR="logs"
 
 # Create the logs directory if it doesn't exist
