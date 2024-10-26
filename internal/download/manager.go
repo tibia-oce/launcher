@@ -1,5 +1,3 @@
-// internal\download\manager.go
-
 package download
 
 import (

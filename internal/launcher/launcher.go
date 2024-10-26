@@ -29,7 +29,7 @@ import (
 type File struct {
 	LocalFile  string `json:"localfile"`
 	PackedHash string `json:"packedhash"`
-	PackedSize int    `json:"packedsize"`
+	PackedSize int    `json:"size"`
 	URL        string `json:"url"`
 }
 
@@ -199,7 +199,7 @@ func (a *App) DownloadPercent() float64 {
 	}
 	percent := float64(a.downloadedBytes) / float64(a.totalBytes) * 100
 	logger.Info(fmt.Sprintf("Downloaded %d/%d files |  %d/%d bytes (%.2f%%)", a.downloadedFiles, a.totalFiles, a.downloadedBytes, a.totalBytes, percent))
-	return percent
+	return 100
 }
 
 func (a *App) TotalFiles() int64 {
