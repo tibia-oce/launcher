@@ -141,3 +141,61 @@ jobs:
             git push origin $new_tag  # Push the new tag to the remote
             git push origin :refs/tags/$latest_tag  # Delete the old tag on the remote
           fi
+
+  notify:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    needs: [release, build]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+  
+      - name: Get Latest Release Data
+        id: get_release
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const commitSha = process.env.GITHUB_SHA;
+            const releases = await github.paginate(
+              github.rest.repos.listReleases,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              }
+            );
+  
+            const release = releases.find(r => r.target_commitish === commitSha && !r.prerelease);
+  
+            if (!release) {
+              console.log('No release found for this commit SHA. Exiting.');
+              core.setOutput('should_notify', 'false');
+              return;
+            }
+  
+            core.setOutput('should_notify', 'true');
+            core.setOutput('name', release.name || release.tag_name);
+            core.setOutput('html_url', release.html_url);
+            core.setOutput('body', release.body || '');
+            core.setOutput('published_at', release.published_at);
+  
+      - name: Send Discord Notification
+        if: steps.get_release.outputs.should_notify == 'true'
+        uses: rjstone/discord-webhook-notify@v1.0.4
+        with:
+          severity: info
+          username: GitHub Releases
+          color: '#ff00aa'
+          avatarUrl: https://github.githubassets.com/images/modules/logos_page/Octocat.png
+          description: |
+            # Launcher
+            **New release published!**    
+            Version: **${{ steps.get_release.outputs.name }}**
+            [View release](${{ steps.get_release.outputs.html_url }})
+          details: |
+            ${{ steps.get_release.outputs.body }}
+          footer: Released
+          webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
+  
+      - name: No New Release Found
+        if: steps.get_release.outputs.should_notify == 'false'
+        run: echo "No new release to notify."
