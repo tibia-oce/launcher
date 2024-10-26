@@ -6,10 +6,22 @@ on:
     branches:
       - master
       - develop
+    paths:
+      - "ui/**"
+      - "internal/**"
+      - "build/**"
+      - "main.go"
+      - "wails.json"
   push:
     branches:
       - master
       - develop
+    paths:
+      - "ui/**"
+      - "internal/**"
+      - "build/**"
+      - "main.go"
+      - "wails.json"
 
 jobs:
   build:
