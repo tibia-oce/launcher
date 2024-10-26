@@ -64,6 +64,9 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs: build
+    outputs:
+      release-version: ${{ steps.extract_version.outputs.RELEASE_VERSION }}
+    
 
     steps:
       - name: Checkout code
@@ -136,48 +139,55 @@ jobs:
             new_tag=${latest_tag%-rc.*}-rc
             new_name="Release ${new_tag}"
             gh release edit "$latest_tag" --tag "$new_tag" --title "$new_name"
-            git tag $new_tag $latest_tag  # Create the new tag pointing to the same commit
-            git tag -d $latest_tag  # Delete the old tag locally
-            git push origin $new_tag  # Push the new tag to the remote
-            git push origin :refs/tags/$latest_tag  # Delete the old tag on the remote
+            git tag $new_tag $latest_tag
+            git tag -d $latest_tag
+            git push origin $new_tag
+            git push origin :refs/tags/$latest_tag
           fi
 
+      - name: Extract Release Version
+        id: extract_version
+        run: |
+          VERSION=$(git describe --tags --abbrev=0)
+          echo "RELEASE_VERSION=${VERSION}" >> $GITHUB_OUTPUT
+
   notify:
-    if: github.ref == 'refs/heads/master'
+    if: needs.release.outputs.release-version != '' && (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     needs: [release, build]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
   
-      - name: Get Latest Release Data
+      - name: Get Release Data
         id: get_release
         uses: actions/github-script@v6
         with:
           script: |
-            const commitSha = process.env.GITHUB_SHA;
-            const releases = await github.paginate(
-              github.rest.repos.listReleases,
-              {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-              }
-            );
-  
-            const release = releases.find(r => r.target_commitish === commitSha && !r.prerelease);
-  
-            if (!release) {
-              console.log('No release found for this commit SHA. Exiting.');
+            const releaseTag = '${{ needs.release.outputs.release-version }}';
+            if (!releaseTag) {
+              console.log('No release tag found. Exiting.');
               core.setOutput('should_notify', 'false');
               return;
             }
-  
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: releaseTag
+            });
+
+            if (!release || release.prerelease) {
+              console.log('No suitable release found. Exiting.');
+              core.setOutput('should_notify', 'false');
+              return;
+            }
+
             core.setOutput('should_notify', 'true');
             core.setOutput('name', release.name || release.tag_name);
             core.setOutput('html_url', release.html_url);
             core.setOutput('body', release.body || '');
             core.setOutput('published_at', release.published_at);
-  
+
       - name: Send Discord Notification
         if: steps.get_release.outputs.should_notify == 'true'
         uses: rjstone/discord-webhook-notify@v1.0.4
