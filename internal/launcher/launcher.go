@@ -275,7 +275,7 @@ func (a *App) Update() {
 					if strings.HasSuffix(file.URL, ".spr") {
 						// If it's a .spr file (which is handled by Git LFS), construct the GitHub API URL instead
 						downloadURL = strings.Replace(a.baseURL+file.URL, "https://raw.githubusercontent.com/", "https://api.github.com/repos/", 1)
-						downloadURL = strings.Replace(downloadURL, "/main/", "/contents/", 1)
+						downloadURL = strings.Replace(downloadURL, "/master/", "/contents/", 1)
 					} else {
 						// For all other files, use the raw content URL
 						downloadURL = a.baseURL + file.URL
@@ -484,7 +484,7 @@ func (a *App) downloadFile(url, dst string, progress bool) error {
 	if strings.HasSuffix(url, ".spr") {
 		// Construct the API URL for the .spr file
 		apiUrl := strings.Replace(url, "https://raw.githubusercontent.com/", "https://api.github.com/repos/", 1)
-		apiUrl = strings.Replace(apiUrl, "/main/", "/contents/", 1)
+		apiUrl = strings.Replace(apiUrl, "/master/", "/contents/", 1)
 
 		// Ensure the destination directory exists
 		dst = filepath.Join(a.appDirectory(), dst)
